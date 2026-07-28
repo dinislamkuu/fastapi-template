@@ -1,0 +1,1 @@
+"""Пакет production-шаблона FastAPI."""

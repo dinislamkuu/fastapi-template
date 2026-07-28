@@ -1,0 +1,107 @@
+name: fastapi-production-template
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app_dev_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - backend
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      args:
+        APP_VERSION: 0.1.0
+        IMAGE_SOURCE: local
+    environment:
+      APP_NAME: fastapi-production-template
+      APP_VERSION: 0.1.0
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://app:app_dev_password@postgres:5432/app
+      REDIS_URL: redis://redis:6379/0
+      DB_POOL_SIZE: 2
+      DB_MAX_OVERFLOW: 2
+      READINESS_TIMEOUT_SECONDS: 1.5
+      DOCS_ENABLED: "true"
+      ALLOWED_HOSTS: localhost,127.0.0.1,app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      args:
+        APP_VERSION: 0.1.0
+        IMAGE_SOURCE: local
+    environment:
+      APP_NAME: fastapi-production-template
+      APP_VERSION: 0.1.0
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://app:app_dev_password@postgres:5432/app
+      REDIS_URL: redis://redis:6379/0
+      DB_POOL_SIZE: 5
+      DB_MAX_OVERFLOW: 10
+      READINESS_TIMEOUT_SECONDS: 1.5
+      DOCS_ENABLED: "true"
+      ALLOWED_HOSTS: localhost,127.0.0.1,app
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+
+networks:
+  backend:

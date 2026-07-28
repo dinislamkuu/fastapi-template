@@ -1,0 +1,25 @@
+title = "fastapi-production-template gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "database-url-with-credentials"
+description = "Database URL with embedded credentials"
+regex = '''(?i)(postgresql|postgres|mysql|mongodb|redis)://[^:\s]+:[^@\s]+@[^/\s]+'''
+keywords = ["postgresql://", "postgres://", "mysql://", "mongodb://", "redis://"]
+tags = ["database", "credentials"]
+
+[allowlist]
+description = "Allow documented local-only example credentials"
+paths = [
+  '''^\.env\.example$''',
+  '''^compose\.ya?ml$''',
+  '''^compose\.test\.ya?ml$''',
+  '''^README\.md$''',
+  '''^tests/''',
+]
+regexes = [
+  '''app_dev_password''',
+  '''app_test_password''',
+]
